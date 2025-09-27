@@ -303,6 +303,15 @@ player chooses the next color, and the next player draws four cards and loses th
 </div>
 </div>
 <script>
+// STATS-FETCHER-START
+fetch('https://www.chromebooker.com/stats/visitors.php', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+},
+body: JSON.stringify({ page: window.location.href })
+});
+// STATS-FETCHER-END
 document.addEventListener('DOMContentLoaded', () => {
 const SUITS = ['red', 'yellow', 'green', 'blue'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
