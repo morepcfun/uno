@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Uno</title>
-<meta name="author" content="Johnny Heggelund">
-<link rel="icon" type="image/x-icon" href="favicon.ico">
+<title>UNO Card Game Online</title>
+<meta name="description" content="Enjoy a classic game of Uno with two AI opponents right in your browser, completely free and without ads!">
+<meta name="author" content="AI Girl & Bossman">
+<meta name="robots" content="index, follow">
 <style>
 :root {
 --card-height: 15vmin;
@@ -257,6 +258,30 @@ background-color: #55aa55;
 .color-option[data-color="blue"] {
 background-color: #5555ff;
 }
+.game-over-modal {
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.8);
+z-index: 100;
+display: none;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+color: white;
+font-size: 5vmin;
+text-align: center;
+}
+.game-over-modal h2 {
+margin: 0;
+}
+.game-over-modal button {
+margin-top: 2vmin;
+padding: 1vmin 2vmin;
+font-size: 2vmin;
+}
 </style>
 </head>
 <body>
@@ -265,7 +290,7 @@ background-color: #5555ff;
 <div class="center-area" style="color: white;">
 <button id="rules-btn" class="rules-btn">Rules</button>
 <br>
-<div id="game-status" class="game-status">Welcome to UNO!</div>
+<div id="game-status" class="game-status"></div>
 <div class="deck-pile-container">
 <div class="card back" id="deck"></div>
 <div class="card" id="discard-pile"></div>
@@ -273,24 +298,25 @@ background-color: #5555ff;
 </div>
 <div class="player-hand" id="ai-player-2-hand"></div>
 <div class="player-hand human-player" id="human-player-hand"></div>
+<div id="game-over-modal" class="game-over-modal">
+<h2 id="winner-message"></h2>
+<button id="play-again-btn">Play Again</button>
+</div>
 </div>
 <div id="rules-modal" class="modal-overlay">
 <div class="modal-content">
 <span id="close-btn" class="close-btn">&times;</span>
-<h2>UNO Rules</h2>
-<p><strong>Goal:</strong> Be the first player to get rid of all your cards.</p>
-<h3>How to Play</h3>
-<p>You can play a card from your hand if it matches the color, number, or symbol of the card on top of the
-discard pile. If you can't play a card, you must draw one from the deck. Good luck!</p>
-<h3>Special Cards</h3>
-<ul>
-<li><strong>Skip (S):</strong> Next player loses their turn.</li>
-<li><strong>Reverse (R):</strong> The direction of play reverses.</li>
-<li><strong>Draw Two (+2):</strong> Next player draws two cards and loses their turn.</li>
-<li><strong>Wild (W):</strong> Can be played on any card. The player who plays it chooses the next
-color.</li>
-<li><strong>Wild Draw Four (W+4):</strong> Can only be played if you have no other playable cards. The
-player chooses the next color, and the next player draws four cards and loses their turn.</li>
+<h2 id="rules-title"></h2>
+<p><strong id="rules-goal-title"></strong> <span id="rules-goal-text"></span></p>
+<h3 id="rules-how-to-title"></h3>
+<p id="rules-how-to-text"></p>
+<h3 id="rules-special-title"></h3>
+<ul id="rules-special-list">
+<li id="rules-skip"></li>
+<li id="rules-reverse"></li>
+<li id="rules-draw2"></li>
+<li id="rules-wild"></li>
+<li id="rules-wild4"></li>
 </ul>
 </div>
 </div>
@@ -303,20 +329,53 @@ player chooses the next color, and the next player draws four cards and loses th
 </div>
 </div>
 <script>
-// STATS-FETCHER-START
-fetch('https://www.chromebooker.com/stats/visitors.php', {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json'
-},
-body: JSON.stringify({ page: window.location.href })
-});
-// STATS-FETCHER-END
 document.addEventListener('DOMContentLoaded', () => {
+const lang = {
+rules: "Rules",
+welcome: "Welcome to UNO!",
+yourTurn: "Your turn.",
+playerTurn: "Player X's turn.",
+aiPlaysCard: "Player X plays a card...",
+aiDrawsCard: "Player X is drawing a card.",
+aiPlaysDrawn: "Player X played the card they drew!",
+aiCouldNotPlay: "Player X couldn't play.",
+aiChoseColor: "Player X chose the color Y.",
+youDrawCard: "You are drawing a card...",
+youPlayDrawn: "You drew a playable card and played it!",
+cardCannotBePlayed: "The card cannot be played. Next turn.",
+invalidMove: "Invalid move. Card must match color or symbol.",
+hasPlayableCard: "You have a playable card. You cannot draw.",
+deckEmpty: "The deck is empty!",
+shuffling: "Shuffling discard pile into the deck.",
+playerSkipped: "Player X was skipped!",
+directionReversed: "Play direction reversed!",
+playerDrawsTwo: "Player X must draw 2 cards!",
+playerDrawsFour: "Player X must draw 4 cards!",
+playerHasUno: "Player X has UNO!",
+youHaveUno: "You have UNO!",
+playerWon: "Player X won the game! Congratulations! 🏆",
+youWon: "You won the game! Congratulations! 🏆",
+gameStarting: "The game is starting...",
+gameStarted: "The game has started!",
+startWithSkip: "Game starts with a Skip! Player X's turn.",
+startWithReverse: "Game starts with a Reverse! Player X's turn.",
+startWithDraw2: "Game starts with a Draw 2! Player X must draw.",
+rulesTitle: "UNO Rules",
+rulesGoalTitle: "Goal:",
+rulesGoalText: "Be the first player to get rid of all your cards.",
+rulesHowToTitle: "How to Play",
+rulesHowToText: "You can play a card from your hand if it matches the color, number, or symbol of the card on top of the discard pile. If you can't play a card, you must draw one from the deck. Good luck!",
+rulesSpecialTitle: "Special Cards",
+rulesSkip: "<strong>Skip (🚫):</strong> The next player loses their turn.",
+rulesReverse: "<strong>Reverse (🔄):</strong> The direction of play reverses.",
+rulesDraw2: "<strong>Draw Two (+2):</strong> The next player draws two cards and loses their turn.",
+rulesWild: "<strong>Wild (W):</strong> Can be played on any card. The player who lays it down chooses the next color.",
+rulesWild4: "<strong>Wild + Draw Four (W+4):</strong> Can only be played if you have no other playable cards. The player chooses the next color, and the next player draws four cards and loses their turn.",
+colors: { 'red': 'Red', 'yellow': 'Yellow', 'green': 'Green', 'blue': 'Blue' }
+};
 const SUITS = ['red', 'yellow', 'green', 'blue'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
 const WILD_VALUES = ['wild', 'wild4'];
-const ENGLISH_COLORS = { 'red': 'Red', 'yellow': 'Yellow', 'green': 'Green', 'blue': 'Blue' };
 const NUM_PLAYERS = 3;
 const HUMAN_PLAYER_INDEX = 0;
 let deck = [];
@@ -337,14 +396,33 @@ const rulesBtn = document.getElementById('rules-btn');
 const rulesModal = document.getElementById('rules-modal');
 const closeBtn = document.getElementById('close-btn');
 const colorPickerModal = document.getElementById('color-picker-modal');
+const gameOverModal = document.getElementById('game-over-modal');
+const winnerMessageEl = document.getElementById('winner-message');
+const playAgainBtn = document.getElementById('play-again-btn');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function updateStaticUIText() {
+document.title = "UNO";
+rulesBtn.textContent = lang.rules;
+gameStatusEl.textContent = lang.welcome;
+document.getElementById('rules-title').textContent = lang.rulesTitle;
+document.getElementById('rules-goal-title').textContent = lang.rulesGoalTitle;
+document.getElementById('rules-goal-text').textContent = lang.rulesGoalText;
+document.getElementById('rules-how-to-title').textContent = lang.rulesHowToTitle;
+document.getElementById('rules-how-to-text').textContent = lang.rulesHowToText;
+document.getElementById('rules-special-title').textContent = lang.rulesSpecialTitle;
+document.getElementById('rules-skip').innerHTML = lang.rulesSkip;
+document.getElementById('rules-reverse').innerHTML = lang.rulesReverse;
+document.getElementById('rules-draw2').innerHTML = lang.rulesDraw2;
+document.getElementById('rules-wild').innerHTML = lang.rulesWild;
+document.getElementById('rules-wild4').innerHTML = lang.rulesWild4;
+}
 function getCardDisplayValue(card) {
 switch (card.value) {
-case 'skip': return 'H';
-case 'reverse': return 'V';
+case 'skip': return '🚫';
+case 'reverse': return '🔄';
 case 'draw2': return '+2';
-case 'wild': return 'V';
-case 'wild4': return 'V+4';
+case 'wild': return 'W';
+case 'wild4': return 'W+4';
 default: return card.value.toUpperCase();
 }
 }
@@ -353,7 +431,7 @@ if (!topCard) return false;
 if (card.suit === 'wild') {
 if (card.value === 'wild4') {
 const playerHand = players[currentPlayerIndex];
-const hasMatchingColorCard = playerHand.some(c => c.suit === topCard.suit);
+const hasMatchingColorCard = playerHand.some(c => c.suit !== 'wild' && c.suit === topCard.suit);
 return !hasMatchingColorCard;
 }
 return true;
@@ -451,8 +529,15 @@ deckEl.classList.add('can-draw');
 deckEl.classList.remove('can-draw');
 }
 }
-function updateStatus(message) {
-gameStatusEl.textContent = message;
+function updateStatus(message, vars = {}) {
+let finalMessage = message;
+if (vars.playerIndex !== undefined) {
+finalMessage = finalMessage.replace('X', vars.playerIndex + 1);
+}
+if (vars.color) {
+finalMessage = finalMessage.replace('Y', lang.colors[vars.color]);
+}
+gameStatusEl.textContent = finalMessage;
 }
 async function onPlayerCardClick(card) {
 if (isProcessingTurn || currentPlayerIndex !== HUMAN_PLAYER_INDEX) return;
@@ -461,9 +546,9 @@ if (isValidPlay(card, topCard)) {
 isProcessingTurn = true;
 await playCard(card, HUMAN_PLAYER_INDEX);
 } else {
-updateStatus("Invalid move. The card must match color or symbol.");
+updateStatus(lang.invalidMove);
 await sleep(2000);
-updateStatus(`Player ${currentPlayerIndex + 1}'s turn.`);
+updateStatus(lang.yourTurn);
 }
 }
 async function onDeckClick() {
@@ -471,21 +556,21 @@ if (isProcessingTurn || currentPlayerIndex !== HUMAN_PLAYER_INDEX) return;
 const topCard = discardPile[discardPile.length - 1];
 const hasPlayableCard = players[HUMAN_PLAYER_INDEX].some(card => isValidPlay(card, topCard));
 if (hasPlayableCard) {
-updateStatus("You have a playable card. You cannot draw.");
+updateStatus(lang.hasPlayableCard);
 return;
 }
 isProcessingTurn = true;
-updateStatus("You draw a card...");
+updateStatus(lang.youDrawCard);
 await sleep(500);
 const drawnCard = drawCard(HUMAN_PLAYER_INDEX);
 updateAllUI();
 await sleep(800);
 if (drawnCard && isValidPlay(drawnCard, discardPile[discardPile.length - 1])) {
-updateStatus("You drew a playable card and play it!");
+updateStatus(lang.youPlayDrawn);
 await sleep(800);
 await playCard(drawnCard, HUMAN_PLAYER_INDEX);
 } else {
-updateStatus("Card could not be played. Turn passes.");
+updateStatus(lang.cardCannotBePlayed);
 await sleep(800);
 currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
 endTurn();
@@ -494,14 +579,14 @@ endTurn();
 function drawCard(playerIndex) {
 if (deck.length === 0) {
 if (discardPile.length <= 1) {
-updateStatus("The deck is out of cards!");
+updateStatus(lang.deckEmpty);
 return null;
 }
 const topCard = discardPile.pop();
 deck = discardPile.map(c => ({ ...c, suit: c.originalSuit }));
 discardPile = [topCard];
 shuffleDeck(deck);
-updateStatus("Shuffling the discard pile into the deck.");
+updateStatus(lang.shuffling);
 }
 const card = deck.pop();
 if (card) {
@@ -520,7 +605,7 @@ if (playedCard.value === 'wild' || playedCard.value === 'wild4') {
 const chosenColor = await handleWildCard(playerIndex);
 playedCard.suit = chosenColor;
 if (playerIndex !== HUMAN_PLAYER_INDEX) {
-updateStatus(`Player ${playerIndex + 1} chose ${ENGLISH_COLORS[chosenColor]}.`);
+updateStatus(lang.aiChoseColor, { playerIndex, color: chosenColor });
 await sleep(800);
 }
 }
@@ -535,16 +620,16 @@ updateAllUI();
 await sleep(500);
 switch (card.value) {
 case 'skip':
-updateStatus(`Player ${nextPlayerIndex + 1} is skipped!`);
+updateStatus(lang.playerSkipped, { playerIndex: nextPlayerIndex });
 currentPlayerIndex = (nextPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
 turnAdvanced = true;
 break;
 case 'reverse':
 gameDirection *= -1;
-updateStatus("Direction of play reversed!");
+updateStatus(lang.directionReversed);
 break;
 case 'draw2':
-updateStatus(`Player ${nextPlayerIndex + 1} must draw 2 cards!`);
+updateStatus(lang.playerDrawsTwo, { playerIndex: nextPlayerIndex });
 await sleep(500);
 drawCard(nextPlayerIndex);
 drawCard(nextPlayerIndex);
@@ -552,7 +637,7 @@ currentPlayerIndex = (nextPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYE
 turnAdvanced = true;
 break;
 case 'wild4':
-updateStatus(`Player ${nextPlayerIndex + 1} must draw 4 cards!`);
+updateStatus(lang.playerDrawsFour, { playerIndex: nextPlayerIndex });
 await sleep(500);
 for (let i = 0; i < 4; i++) drawCard(nextPlayerIndex);
 currentPlayerIndex = (nextPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
@@ -567,25 +652,25 @@ endTurn();
 }
 function endTurn() {
 updateAllUI();
-updateStatus(`Player ${currentPlayerIndex + 1}'s turn.`);
-if (currentPlayerIndex !== HUMAN_PLAYER_INDEX) {
+if (currentPlayerIndex === HUMAN_PLAYER_INDEX) {
+updateStatus(lang.yourTurn);
+isProcessingTurn = false;
+} else {
+updateStatus(lang.playerTurn, { playerIndex: currentPlayerIndex });
 isProcessingTurn = true;
 setTimeout(aiTurn, 1200);
-} else {
-isProcessingTurn = false;
 }
 }
 function checkWinCondition(playerIndex) {
-const playerName = playerIndex === HUMAN_PLAYER_INDEX ? "You" : `Player ${playerIndex + 1}`;
 if (players[playerIndex].length === 0) {
-setTimeout(() => {
-alert(`${playerName} won the game! Congratulations! 🏆`);
-startGame();
-}, 500);
+const message = playerIndex === HUMAN_PLAYER_INDEX ? lang.youWon : lang.playerWon.replace('X', playerIndex + 1);
+winnerMessageEl.textContent = message;
+gameOverModal.style.display = 'flex';
 return true;
 }
 if (players[playerIndex].length === 1) {
-updateStatus(`${playerName} has UNO!`);
+const message = playerIndex === HUMAN_PLAYER_INDEX ? lang.youHaveUno : lang.playerHasUno.replace('X', playerIndex + 1);
+updateStatus(message);
 }
 return false;
 }
@@ -626,28 +711,58 @@ if (playableCards.length > 0) {
 let cardToPlay =
 playableCards.find(c => ['wild4', 'draw2', 'skip', 'reverse'].includes(c.value)) ||
 playableCards[Math.floor(Math.random() * playableCards.length)];
-updateStatus(`Player ${aiIndex + 1} plays a card...`);
+updateStatus(lang.aiPlaysCard, { playerIndex: aiIndex });
 await sleep(800);
 await playCard(cardToPlay, aiIndex);
 } else {
-updateStatus(`Player ${aiIndex + 1} draws a card.`);
+updateStatus(lang.aiDrawsCard, { playerIndex: aiIndex });
 await sleep(800);
 const drawnCard = drawCard(aiIndex);
 updateAllUI();
 await sleep(500);
 if (drawnCard && isValidPlay(drawnCard, discardPile[discardPile.length - 1])) {
-updateStatus(`Player ${aiIndex + 1} plays the drawn card!`);
+updateStatus(lang.aiPlaysDrawn, { playerIndex: aiIndex });
 await sleep(800);
 await playCard(drawnCard, aiIndex);
 } else {
-updateStatus(`Player ${aiIndex + 1} could not play.`);
+updateStatus(lang.aiCouldNotPlay, { playerIndex: aiIndex });
 await sleep(800);
 currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
 endTurn();
 }
 }
 }
+async function handleFirstCard(card) {
+discardPile.push(card);
+updateAllUI();
+await sleep(500);
+switch (card.value) {
+case 'skip':
+currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
+updateStatus(lang.startWithSkip, { playerIndex: currentPlayerIndex });
+break;
+case 'reverse':
+gameDirection *= -1;
+currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
+updateStatus(lang.startWithReverse, { playerIndex: currentPlayerIndex });
+break;
+case 'draw2':
+updateStatus(lang.startWithDraw2, { playerIndex: currentPlayerIndex });
+await sleep(500);
+drawCard(currentPlayerIndex);
+drawCard(currentPlayerIndex);
+currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
+break;
+case 'wild':
+const chosenColor = await handleWildCard(HUMAN_PLAYER_INDEX);
+card.suit = chosenColor;
+break;
+}
+await sleep(800);
+endTurn();
+}
 async function startGame() {
+gameOverModal.style.display = 'none';
 deck = createDeck();
 shuffleDeck(deck);
 players = Array(NUM_PLAYERS).fill(0).map(() => []);
@@ -661,55 +776,30 @@ players[j].push(deck.pop());
 }
 }
 let firstCard = deck.pop();
-while (firstCard.suit === 'wild') {
+while (firstCard.value === 'wild4') {
 deck.push(firstCard);
 shuffleDeck(deck);
 firstCard = deck.pop();
 }
-discardPile.push(firstCard);
 updateAllUI();
-updateStatus("Game is starting...");
+updateStatus(lang.gameStarting);
 await sleep(1000);
-let startMessage = `Game started! Player 1's turn.`;
-let initialTurnHandled = false;
-switch (firstCard.value) {
-case 'skip':
-currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
-startMessage = `Game starts with Skip! Player ${currentPlayerIndex + 1}'s turn.`;
-initialTurnHandled = true;
-break;
-case 'reverse':
-gameDirection *= -1;
-currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
-startMessage = `Game starts with Reverse! Player ${currentPlayerIndex + 1}'s turn.`;
-initialTurnHandled = true;
-break;
-case 'draw2':
-startMessage = `Game starts with Draw 2! Player 1 must draw.`;
-updateStatus(startMessage);
-await sleep(800);
-drawCard(0);
-drawCard(0);
-updateAllUI();
-currentPlayerIndex = (currentPlayerIndex + gameDirection + NUM_PLAYERS) % NUM_PLAYERS;
-startMessage = `Player ${currentPlayerIndex + 1}'s turn.`;
-initialTurnHandled = true;
-break;
-}
-updateStatus(startMessage);
-endTurn();
+await handleFirstCard(firstCard);
 }
 rulesBtn.addEventListener('click', () => { rulesModal.style.display = 'flex'; });
 closeBtn.addEventListener('click', () => { rulesModal.style.display = 'none'; });
+playAgainBtn.addEventListener('click', startGame);
 window.addEventListener('click', (event) => {
 if (event.target === rulesModal) {
 rulesModal.style.display = 'none';
 }
 });
 deckEl.addEventListener('click', onDeckClick);
+updateStaticUIText();
 startGame();
 rulesModal.style.display = 'flex';
 });
 </script>
+<script src="/stats/tracker.js" defer></script>
 </body>
 </html>
