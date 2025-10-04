@@ -776,7 +776,8 @@ players[j].push(deck.pop());
 }
 }
 let firstCard = deck.pop();
-while (firstCard.value === 'wild4') {
+const specialActionValues = ['skip', 'reverse', 'draw2', 'wild4'];
+while (specialActionValues.includes(firstCard.value)) {
 deck.push(firstCard);
 shuffleDeck(deck);
 firstCard = deck.pop();
